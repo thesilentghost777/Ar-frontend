@@ -13,6 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context/AuthContext';
 import { theme } from '../../config/theme';
 import { useNavigation } from '@react-navigation/native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 export const ProfileScreen = () => {
   const { user, logout } = useAuth();
@@ -120,7 +121,8 @@ export const ProfileScreen = () => {
   };
 
   return (
-    <View style={styles.container}>
+     <SafeAreaProvider>
+        <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={theme.colors.primary} />
       
      
@@ -314,7 +316,8 @@ export const ProfileScreen = () => {
 
         <View style={styles.bottomSpacer} />
       </ScrollView>
-    </View>
+    </SafeAreaView>
+    </SafeAreaProvider>
   );
 };
 

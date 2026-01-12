@@ -14,6 +14,7 @@ import { apiRequest } from '../../config/api';
 import { Module, ProgressionType } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import Toast from 'react-native-toast-message';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 export default function CoursTheoriqueScreen({ navigation }: any) {
   const [modules, setModules] = useState<Module[]>([]);
@@ -165,7 +166,8 @@ export default function CoursTheoriqueScreen({ navigation }: any) {
   }
 
   return (
-    <View style={styles.container}>
+     <SafeAreaProvider>
+        <SafeAreaView style={styles.container}>
       <FlatList
         data={modules}
         renderItem={renderModuleItem}
@@ -190,7 +192,8 @@ export default function CoursTheoriqueScreen({ navigation }: any) {
           </View>
         }
       />
-    </View>
+    </SafeAreaView>
+    </SafeAreaProvider>
   );
 }
 

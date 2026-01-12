@@ -13,6 +13,7 @@ import { apiRequest } from '../../config/api';
 import { Lecon } from '../../types';
 import { useAuth } from '../../context/AuthContext'; // Adjust the path according to your project structure
 import Toast from 'react-native-toast-message';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 export default function LeconDetailScreen({ route, navigation }: any) {
   const { leconId, chapitreId, moduleId, type } = route.params;
@@ -99,7 +100,8 @@ export default function LeconDetailScreen({ route, navigation }: any) {
   }
 
   return (
-    <View style={styles.container}>
+     <SafeAreaProvider>
+        <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
           <Text style={styles.title}>{lecon.titre}</Text>
@@ -179,7 +181,8 @@ export default function LeconDetailScreen({ route, navigation }: any) {
           </TouchableOpacity>
         </View>
       )}
-    </View>
+    </SafeAreaView>
+    </SafeAreaProvider>
   );
 }
 

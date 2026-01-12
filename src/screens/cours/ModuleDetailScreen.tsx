@@ -13,6 +13,7 @@ import { apiRequest } from '../../config/api';
 import { Module, Chapitre } from '../../types';
 import { useAuth } from '../../context/AuthContext'; // Ajustez le chemin selon votre structure de projet
 import Toast from 'react-native-toast-message';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 export default function ModuleDetailScreen({ route, navigation }: any) {
   const { moduleId, type } = route.params;
@@ -169,7 +170,8 @@ export default function ModuleDetailScreen({ route, navigation }: any) {
   }
 
   return (
-    <View style={styles.container}>
+     <SafeAreaProvider>
+        <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.moduleTitle}>{module.nom}</Text>
         {module.description && (
@@ -209,7 +211,8 @@ export default function ModuleDetailScreen({ route, navigation }: any) {
           </View>
         }
       />
-    </View>
+    </SafeAreaView>
+    </SafeAreaProvider>
   );
 }
 

@@ -20,6 +20,7 @@ import { apiRequest } from '../../config/api';
 import { Paiement } from '../../types';
 import { formatCurrency, formatDateTime } from '../../utils/formatters';
 import Toast from 'react-native-toast-message';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 export default function HistoriqueScreen() {
   const { token, user } = useAuth();
@@ -227,7 +228,8 @@ export default function HistoriqueScreen() {
   }
 
   return (
-    <View style={styles.container}>
+     <SafeAreaProvider>
+        <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Historique des transactions</Text>
         {user && (
@@ -262,7 +264,8 @@ export default function HistoriqueScreen() {
           }
         />
       )}
-    </View>
+    </SafeAreaView>
+    </SafeAreaProvider>
   );
 }
 

@@ -13,6 +13,7 @@ import { theme } from '../../config/theme';
 import { apiRequest } from '../../config/api';
 import { useAuth } from '../../context/AuthContext'; // Ajustez le chemin selon votre structure de projet
 import Toast from 'react-native-toast-message';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 export default function LeconWebViewScreen({ route, navigation }: any) {
   const { url, titre, leconId } = route.params;
@@ -76,7 +77,8 @@ export default function LeconWebViewScreen({ route, navigation }: any) {
   };
 
   return (
-    <View style={styles.container}>
+     <SafeAreaProvider>
+        <SafeAreaView style={styles.container}>
       <WebView
         source={{ uri: url }}
         onLoadStart={() => setLoading(true)}
@@ -129,7 +131,8 @@ export default function LeconWebViewScreen({ route, navigation }: any) {
           )}
         </TouchableOpacity>
       </View>
-    </View>
+    </SafeAreaView>
+    </SafeAreaProvider>
   );
 }
 

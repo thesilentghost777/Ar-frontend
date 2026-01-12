@@ -18,6 +18,57 @@ import { useNavigation } from '@react-navigation/native';
 import { apiRequest } from '../../config/api';
 import Toast from 'react-native-toast-message';
 import { Picker } from '@react-native-picker/picker';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+
+// CORRECTION: Déplacer InputField EN DEHORS du composant principal
+const InputField = ({
+  label,
+  value,
+  onChangeText,
+  placeholder,
+  icon,
+  error,
+  secureTextEntry = false,
+  keyboardType = 'default',
+  editable = true,
+  showPassword,
+  onTogglePassword,
+}: any) => (
+  <View style={styles.inputGroup}>
+    <Text style={styles.label}>{label}</Text>
+    <View style={[styles.inputContainer, error && styles.inputError]}>
+      <Ionicons
+        name={icon}
+        size={20}
+        color={error ? '#EF4444' : theme.colors.primary}
+        style={styles.inputIcon}
+      />
+      <TextInput
+        style={[styles.input, !editable && styles.inputDisabled]}
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor="#9CA3AF"
+        secureTextEntry={secureTextEntry && !showPassword}
+        keyboardType={keyboardType}
+        editable={editable}
+      />
+      {secureTextEntry && (
+        <TouchableOpacity
+          onPress={onTogglePassword}
+          style={styles.eyeIcon}
+        >
+          <Ionicons
+            name={showPassword ? 'eye-off' : 'eye'}
+            size={20}
+            color="#9CA3AF"
+          />
+        </TouchableOpacity>
+      )}
+    </View>
+    {error && <Text style={styles.errorText}>{error}</Text>}
+  </View>
+);
 
 export const EditProfileScreen = () => {
   const { user, token, refreshUser } = useAuth();
@@ -144,62 +195,16 @@ export const EditProfileScreen = () => {
     });
   };
 
-  const InputField = ({
-    label,
-    value,
-    onChangeText,
-    placeholder,
-    icon,
-    error,
-    secureTextEntry = false,
-    keyboardType = 'default',
-    editable = true,
-  }: any) => (
-    <View style={styles.inputGroup}>
-      <Text style={styles.label}>{label}</Text>
-      <View style={[styles.inputContainer, error && styles.inputError]}>
-        <Ionicons
-          name={icon}
-          size={20}
-          color={error ? '#EF4444' : theme.colors.primary}
-          style={styles.inputIcon}
-        />
-        <TextInput
-          style={[styles.input, !editable && styles.inputDisabled]}
-          value={value}
-          onChangeText={onChangeText}
-          placeholder={placeholder}
-          placeholderTextColor="#9CA3AF"
-          secureTextEntry={secureTextEntry && !showPassword}
-          keyboardType={keyboardType}
-          editable={editable}
-        />
-        {secureTextEntry && (
-          <TouchableOpacity
-            onPress={() => setShowPassword(!showPassword)}
-            style={styles.eyeIcon}
-          >
-            <Ionicons
-              name={showPassword ? 'eye-off' : 'eye'}
-              size={20}
-              color="#9CA3AF"
-            />
-          </TouchableOpacity>
-        )}
-      </View>
-      {error && <Text style={styles.errorText}>{error}</Text>}
-    </View>
-  );
-
   return (
-    <View style={styles.container}>
+     <SafeAreaProvider>
+        <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={theme.colors.primary} />
       
-    
       <ScrollView 
         style={styles.scrollView} 
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
       >
         {/* Informations personnelles */}
         <View style={styles.section}>
@@ -307,6 +312,8 @@ export const EditProfileScreen = () => {
               placeholder="••••••••"
               icon="lock-closed"
               secureTextEntry={true}
+              showPassword={showPassword}
+              onTogglePassword={() => setShowPassword(!showPassword)}
               error={errors.password}
             />
             <InputField
@@ -316,6 +323,8 @@ export const EditProfileScreen = () => {
               placeholder="••••••••"
               icon="lock-closed"
               secureTextEntry={true}
+              showPassword={showPassword}
+              onTogglePassword={() => setShowPassword(!showPassword)}
               error={errors.passwordConfirmation}
             />
           </View>
@@ -373,7 +382,8 @@ export const EditProfileScreen = () => {
 
         <View style={styles.bottomSpacer} />
       </ScrollView>
-    </View>
+    </SafeAreaView>
+    </SafeAreaProvider>
   );
 };
 

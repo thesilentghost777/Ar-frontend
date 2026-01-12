@@ -20,20 +20,23 @@ const LoginScreen: React.FC<Props> = ({ navigation }) => {
   const [errors, setErrors] = useState<{ telephone?: string; password?: string }>({});
 
   const handleLogin = async () => {
-    const newErrors: { telephone?: string; password?: string } = {};
-    if (!telephone) newErrors.telephone = 'Le téléphone est requis';
-    if (!password) newErrors.password = 'Le mot de passe est requis';
-    
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
-      return;
-    }
+  const trimmedTelephone = telephone.trim();
+  const trimmedPassword = password.trim();
 
-    setLoading(true);
-    setErrors({});
-    await login(telephone, password);
-    setLoading(false);
-  };
+  const newErrors: { telephone?: string; password?: string } = {};
+  if (!trimmedTelephone) newErrors.telephone = 'Le téléphone est requis';
+  if (!trimmedPassword) newErrors.password = 'Le mot de passe est requis';
+
+  if (Object.keys(newErrors).length > 0) {
+    setErrors(newErrors);
+    return;
+  }
+
+  setLoading(true);
+  setErrors({});
+  await login(trimmedTelephone, trimmedPassword);
+  setLoading(false);
+};
 
   return (
     <SafeAreaView style={styles.container}>

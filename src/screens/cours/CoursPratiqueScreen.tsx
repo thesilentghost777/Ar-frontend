@@ -14,6 +14,7 @@ import { apiRequest } from '../../config/api';
 import { Module, ProgressionType } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import Toast from 'react-native-toast-message';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 export default function CoursPratiqueScreen({ navigation }: any) {
   const [modules, setModules] = useState<Module[]>([]);
@@ -66,7 +67,7 @@ export default function CoursPratiqueScreen({ navigation }: any) {
             <View style={[styles.progressFill, { width: `${progression.lecons.pourcentage}%`, backgroundColor: theme.colors.secondary }]} />
           </View>
           <Text style={styles.progressText}>
-            {progression.lecons.completes}/{progression.lecons.total} visionnées ({progression.lecons.pourcentage.toFixed(0)}%)
+            {progression.lecons.completes}/{progression.lecons.total} terminées ({progression.lecons.pourcentage.toFixed(0)}%)
           </Text>
         </View>
         <View style={styles.progressSection}>
@@ -149,7 +150,7 @@ export default function CoursPratiqueScreen({ navigation }: any) {
             <Ionicons name="lock-closed-outline" size={16} color={theme.colors.warning} style={{ marginRight: 4 }} />
           )}
           <Text style={[styles.actionText, !premierDepotEffectue ? { color: theme.colors.warning } : { color: theme.colors.secondary }]}>
-            {premierDepotEffectue ? (item.complete ? 'Revoir' : 'Visionner') : 'Aperçu'}
+            {premierDepotEffectue ? (item.complete ? 'Recommencer' : 'Accéder') : 'Aperçu'}
           </Text>
           <Ionicons name="chevron-forward" size={20} color={premierDepotEffectue ? theme.colors.secondary : theme.colors.warning} />
         </View>
@@ -167,7 +168,8 @@ export default function CoursPratiqueScreen({ navigation }: any) {
   }
 
   return (
-    <View style={styles.container}>
+     <SafeAreaProvider>
+        <SafeAreaView style={styles.container}>
       <FlatList
         data={modules}
         renderItem={renderModuleItem}
@@ -192,7 +194,8 @@ export default function CoursPratiqueScreen({ navigation }: any) {
           </View>
         }
       />
-    </View>
+    </SafeAreaView>
+    </SafeAreaProvider>
   );
 }
 

@@ -10,6 +10,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../config/theme';
 import { QuizResultat, Correction } from '../../types';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 export default function QuizResultatScreen({ route, navigation }: any) {
   const { resultat, corrections, chapitreId } = route.params as {
@@ -39,7 +40,8 @@ export default function QuizResultatScreen({ route, navigation }: any) {
   };
 
   return (
-    <View style={styles.container}>
+     <SafeAreaProvider>
+        <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
         {/* Carte de résultat principal */}
         <View style={[styles.resultCard, { borderColor: getScoreColor() }]}>
@@ -204,7 +206,8 @@ export default function QuizResultatScreen({ route, navigation }: any) {
           <Ionicons name="arrow-forward" size={20} color={theme.colors.textInverse} />
         </TouchableOpacity>
       </View>
-    </View>
+    </SafeAreaView>
+    </SafeAreaProvider>
   );
 }
 

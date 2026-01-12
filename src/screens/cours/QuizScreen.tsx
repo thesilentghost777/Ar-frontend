@@ -15,6 +15,7 @@ import { apiRequest } from '../../config/api';
 import { Quiz, Question, Reponse } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import Toast from 'react-native-toast-message';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 export default function QuizScreen({ route, navigation }: any) {
   const { chapitreId, quizId } = route.params;
@@ -177,7 +178,8 @@ export default function QuizScreen({ route, navigation }: any) {
   const answeredCount = Object.keys(responses).length;
 
   return (
-    <View style={styles.container}>
+     <SafeAreaProvider>
+        <SafeAreaView style={styles.container}>
       {/* Header avec timer et progression */}
       <View style={styles.header}>
         <View style={styles.timerContainer}>
@@ -243,6 +245,7 @@ export default function QuizScreen({ route, navigation }: any) {
       <ScrollView 
         style={styles.content}
         contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={true}
       >
         <View style={styles.questionCard}>
           <View style={styles.questionHeader}>
@@ -330,35 +333,36 @@ export default function QuizScreen({ route, navigation }: any) {
             ))}
           </View>
         </View>
-      </ScrollView>
 
-      {/* Footer avec bouton de soumission */}
-      <View style={styles.footer}>
-        <TouchableOpacity
-          style={[
-            styles.submitButton,
-            submitting && styles.submitButtonDisabled,
-          ]}
-          onPress={handleSubmit}
-          disabled={submitting}
-        >
-          {submitting ? (
-            <ActivityIndicator color={theme.colors.textInverse} />
-          ) : (
-            <>
-              <Text style={styles.submitButtonText}>
-                Soumettre ({answeredCount}/{quiz.questions.length})
-              </Text>
-              <Ionicons
-                name="checkmark-circle"
-                size={20}
-                color={theme.colors.textInverse}
-              />
-            </>
-          )}
-        </TouchableOpacity>
-      </View>
-    </View>
+        {/* Bouton de soumission dans le ScrollView */}
+        <View style={styles.submitContainer}>
+          <TouchableOpacity
+            style={[
+              styles.submitButton,
+              submitting && styles.submitButtonDisabled,
+            ]}
+            onPress={handleSubmit}
+            disabled={submitting}
+          >
+            {submitting ? (
+              <ActivityIndicator color={theme.colors.textInverse} />
+            ) : (
+              <>
+                <Text style={styles.submitButtonText}>
+                  Soumettre le quiz ({answeredCount}/{quiz.questions.length})
+                </Text>
+                <Ionicons
+                  name="checkmark-circle"
+                  size={20}
+                  color={theme.colors.textInverse}
+                />
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+    </SafeAreaProvider>
   );
 }
 
@@ -433,7 +437,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: theme.spacing.xl,
+    paddingBottom: theme.spacing.md,
   },
   questionCard: {
     backgroundColor: theme.colors.surface,
@@ -523,7 +527,6 @@ const styles = StyleSheet.create({
   questionNavigation: {
     backgroundColor: theme.colors.surface,
     margin: theme.spacing.md,
-    marginBottom: theme.spacing.xl,
     padding: theme.spacing.lg,
     borderRadius: theme.borderRadius.lg,
     ...theme.shadows.sm,
@@ -564,12 +567,9 @@ const styles = StyleSheet.create({
     color: theme.colors.textInverse,
     fontWeight: '600',
   },
-  footer: {
+  submitContainer: {
     padding: theme.spacing.md,
-    backgroundColor: theme.colors.surface,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
-    ...theme.shadows.lg,
+    paddingBottom: theme.spacing.lg,
   },
   submitButton: {
     flexDirection: 'row',
@@ -579,6 +579,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.xl,
     paddingVertical: theme.spacing.md,
     borderRadius: theme.borderRadius.md,
+    ...theme.shadows.md,
   },
   submitButtonDisabled: {
     opacity: 0.6,

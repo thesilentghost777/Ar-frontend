@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -7,11 +7,12 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
+  Keyboard,
   Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Picker } from '@react-native-picker/picker';
 import { AuthStackParamList } from '../../types';
 import { theme } from '../../config/theme';
 import { useAuth } from '../../context/AuthContext';
@@ -26,19 +27,108 @@ type Props = {
 
 type Vague = '1' | '2';
 
+// Composant Select personnalisé
+interface SelectProps {
+  label: string;
+  value: string;
+  placeholder: string;
+  options: { label: string; value: string | number }[];
+  onSelect: (value: any) => void;
+  disabled?: boolean;
+}
+
+const CustomSelect: React.FC<SelectProps> = ({
+  label,
+  value,
+  placeholder,
+  options,
+  onSelect,
+  disabled = false,
+}) => {
+  const [modalVisible, setModalVisible] = useState(false);
+  
+  const selectedLabel = options.find(opt => String(opt.value) === String(value))?.label || placeholder;
+  const hasValue = value !== '' && String(value) !== '0';
+
+  return (
+    <View style={styles.selectWrapper}>
+      <Text style={styles.label}>{label}</Text>
+      <TouchableOpacity
+        style={[
+          styles.selectButton,
+          disabled && styles.selectButtonDisabled,
+        ]}
+        onPress={() => !disabled && setModalVisible(true)}
+        disabled={disabled}
+        activeOpacity={0.7}
+      >
+        <Text style={[
+          styles.selectButtonText,
+          !hasValue && styles.selectPlaceholder,
+        ]}>
+          {selectedLabel}
+        </Text>
+        <Text style={styles.selectArrow}>▼</Text>
+      </TouchableOpacity>
+
+      <Modal
+        visible={modalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setModalVisible(false)}
+        >
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{label}</Text>
+              <TouchableOpacity
+                onPress={() => setModalVisible(false)}
+                style={styles.modalCloseBtn}
+              >
+                <Text style={styles.modalCloseText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalScroll}>
+              {options.map((option) => (
+                <TouchableOpacity
+                  key={String(option.value)}
+                  style={[
+                    styles.modalOption,
+                    String(option.value) === String(value) && styles.modalOptionSelected,
+                  ]}
+                  onPress={() => {
+                    onSelect(option.value);
+                    setModalVisible(false);
+                  }}
+                >
+                  <Text style={[
+                    styles.modalOptionText,
+                    String(option.value) === String(value) && styles.modalOptionTextSelected,
+                  ]}>
+                    {option.label}
+                  </Text>
+                  {String(option.value) === String(value) && (
+                    <Text style={styles.modalCheckmark}>✓</Text>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    </View>
+  );
+};
+
 const RegisterScreen: React.FC<Props> = ({ navigation }) => {
   const { register } = useAuth();
   const { sessions, centresExamen, lieuxPratique, getDefaultParrainageCode } = useConfig();
 
   const [loading, setLoading] = useState(false);
-  const [step, setStep] = useState(1);
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showYearPicker, setShowYearPicker] = useState(false);
-  
-  const [selectedDate, setSelectedDate] = useState(new Date(2000, 0, 1));
-  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
-  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
-
   const [formData, setFormData] = useState({
     nom: '',
     prenom: '',
@@ -58,514 +148,449 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
 
   const [availableVagues, setAvailableVagues] = useState<Vague[]>([]);
 
-  const monthNames = [
-    'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
-    'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
+  // Filtres des données actives
+  const activeSessions = useMemo(() => 
+    sessions?.filter(s => s?.active) || [], [sessions]
+  );
+  
+  const activeCentres = useMemo(() => 
+    centresExamen?.filter(c => c?.active) || [], [centresExamen]
+  );
+  
+  const activeLieux = useMemo(() => 
+    lieuxPratique?.filter(l => l?.active) || [], [lieuxPratique]
+  );
+
+  // Options pour les selects
+  const permisOptions = [
+    { label: 'A (Moto)', value: 'permis_a' },
+    { label: 'B (Voiture)', value: 'permis_b' },
   ];
 
-  const daysOfWeek = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
+  const coursOptions = [
+    { label: 'En ligne', value: 'en_ligne' },
+    { label: 'Présentiel (Samedi)', value: 'presentiel' },
+    { label: 'Les deux', value: 'les_deux' },
+  ];
 
-  // Génération des années (de 1940 à aujourd'hui)
-  const currentYearNow = new Date().getFullYear();
-  const years = Array.from({ length: currentYearNow - 1939 }, (_, i) => currentYearNow - i);
+  const sessionOptions = useMemo(() => [
+    { label: 'Choisir une session', value: 0 },
+    ...activeSessions.map(s => ({ label: s.nom, value: s.id })),
+  ], [activeSessions]);
 
+  const vagueOptions = useMemo(() => [
+    { label: 'Choisir une vague', value: '' },
+    ...availableVagues.map(v => ({ label: `Vague ${v}`, value: v })),
+  ], [availableVagues]);
+
+  const centreOptions = useMemo(() => [
+    { label: 'Choisir un centre', value: 0 },
+    ...activeCentres.map(c => ({
+      label: `${c.nom} ${c.ville ? `(${c.ville})` : ''}`,
+      value: c.id,
+    })),
+  ], [activeCentres]);
+
+  // Gestion des vagues disponibles
   useEffect(() => {
-    if (formData.session_id === 0) {
+    if (formData.session_id === 0 || !sessions) {
       setAvailableVagues([]);
-      updateField('vague', '');
+      setFormData(prev => ({ ...prev, vague: '' }));
       return;
     }
 
-    const selectedSession = sessions?.find((s) => s.id === formData.session_id);
+    const selectedSession = sessions.find(s => s?.id === formData.session_id);
     if (!selectedSession) {
       setAvailableVagues([]);
-      updateField('vague', '');
       return;
     }
 
     const vagues: Vague[] = [];
     if (selectedSession.date_enregistrement_vague1) vagues.push('1');
     if (selectedSession.date_enregistrement_vague2) vagues.push('2');
-
+    
     setAvailableVagues(vagues);
-
-    if (vagues.length === 1) {
-      updateField('vague', vagues[0]);
-    } else {
-      updateField('vague', '');
+    
+    if (vagues.length === 1 && formData.vague !== vagues[0]) {
+      setFormData(prev => ({ ...prev, vague: vagues[0] }));
     }
   }, [formData.session_id, sessions]);
 
   const updateField = <K extends keyof typeof formData>(
     field: K,
     value: (typeof formData)[K]
-  ) => setFormData((prev) => ({ ...prev, [field]: value }));
+  ) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
 
   const toggleLieuPratique = (id: number) => {
-    setFormData((prev) => {
-      const lieux = prev.lieux_pratique;
-      if (lieux.includes(id)) {
-        return { ...prev, lieux_pratique: lieux.filter((l) => l !== id) };
-      }
-      return { ...prev, lieux_pratique: [...lieux, id] };
-    });
+    setFormData(prev => ({
+      ...prev,
+      lieux_pratique: prev.lieux_pratique.includes(id)
+        ? prev.lieux_pratique.filter(l => l !== id)
+        : [...prev.lieux_pratique, id]
+    }));
   };
 
   const handleNoCode = async () => {
-    const defaultCode = await getDefaultParrainageCode();
-    if (defaultCode) {
-      updateField('code_parrainage', defaultCode);
+    try {
+      const defaultCode = await getDefaultParrainageCode();
+      if (defaultCode) {
+        updateField('code_parrainage', defaultCode);
+        Toast.show({
+          type: 'info',
+          text1: 'Code par défaut appliqué',
+        });
+      }
+    } catch (error) {
       Toast.show({
-        type: 'info',
-        text1: 'Code par défaut appliqué',
-        text2: defaultCode,
+        type: 'error',
+        text1: 'Impossible de récupérer le code',
       });
     }
   };
 
-  const getDaysInMonth = (month: number, year: number) => {
-    return new Date(year, month + 1, 0).getDate();
-  };
-
-  const getFirstDayOfMonth = (month: number, year: number) => {
-    return new Date(year, month, 1).getDay();
-  };
-
-  const generateCalendarDays = () => {
-    const daysInMonth = getDaysInMonth(currentMonth, currentYear);
-    const firstDay = getFirstDayOfMonth(currentMonth, currentYear);
-    const days: (number | null)[] = [];
-
-    for (let i = 0; i < firstDay; i++) {
-      days.push(null);
-    }
-
-    for (let i = 1; i <= daysInMonth; i++) {
-      days.push(i);
-    }
-
-    return days;
-  };
-
-  const handleDateSelect = (day: number) => {
-    const newDate = new Date(currentYear, currentMonth, day);
-    setSelectedDate(newDate);
-  };
-
-  const handleDateConfirm = () => {
-    const formattedDate = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
-    updateField('date_naissance', formattedDate);
-    setShowDatePicker(false);
-  };
-
-  const formatDateDisplay = (dateString: string) => {
-    if (!dateString) return '';
-    const [year, month, day] = dateString.split('-');
-    return `${day}/${month}/${year}`;
-  };
-
-  const previousMonth = () => {
-    if (currentMonth === 0) {
-      setCurrentMonth(11);
-      setCurrentYear(currentYear - 1);
-    } else {
-      setCurrentMonth(currentMonth - 1);
-    }
-  };
-
-  const nextMonth = () => {
-    const today = new Date();
-    if (currentYear === today.getFullYear() && currentMonth === today.getMonth()) {
-      return;
-    }
-    if (currentMonth === 11) {
-      setCurrentMonth(0);
-      setCurrentYear(currentYear + 1);
-    } else {
-      setCurrentMonth(currentMonth + 1);
-    }
-  };
-
-  const isToday = (day: number) => {
-    const today = new Date();
-    return day === today.getDate() && 
-           currentMonth === today.getMonth() && 
-           currentYear === today.getFullYear();
-  };
-
-  const isSelected = (day: number) => {
-    return day === selectedDate.getDate() && 
-           currentMonth === selectedDate.getMonth() && 
-           currentYear === selectedDate.getFullYear();
-  };
-
-  const handleYearSelect = (year: number) => {
-    setCurrentYear(year);
-    setShowYearPicker(false);
-  };
-
-  const validateAndNext = () => {
-    if (step === 2 && formData.session_id === 0) {
-      Toast.show({ type: 'error', text1: 'Veuillez sélectionner une session' });
+  const validateForm = (): boolean => {
+    if (!formData.nom.trim()) {
+      Toast.show({ type: 'error', text1: 'Le nom est requis' });
       return false;
     }
-    if (step === 2 && availableVagues.length === 0) {
-      Toast.show({ type: 'error', text1: 'Aucune vague disponible pour cette session' });
+    if (!formData.prenom.trim()) {
+      Toast.show({ type: 'error', text1: 'Le prénom est requis' });
       return false;
     }
-    if (step === 2 && formData.vague === '') {
-      Toast.show({ type: 'error', text1: 'Veuillez choisir une vague' });
+    if (!formData.telephone.trim() || formData.telephone.length < 9) {
+      Toast.show({ type: 'error', text1: 'Numéro invalide (9 chiffres)' });
       return false;
     }
-    if (step === 3 && formData.centre_examen_id === 0) {
-      Toast.show({ type: 'error', text1: 'Veuillez sélectionner un centre d\'examen' });
+    if (formData.session_id === 0) {
+      Toast.show({ type: 'error', text1: 'Sélectionnez une session' });
+      return false;
+    }
+    if (formData.vague === '') {
+      Toast.show({ type: 'error', text1: 'Sélectionnez une vague' });
+      return false;
+    }
+    if (formData.centre_examen_id === 0) {
+      Toast.show({ type: 'error', text1: 'Sélectionnez un centre d\'examen' });
+      return false;
+    }
+    if (formData.lieux_pratique.length === 0) {
+      Toast.show({ type: 'error', text1: 'Sélectionnez au moins un lieu' });
+      return false;
+    }
+    if (formData.password.length < 6) {
+      Toast.show({ type: 'error', text1: 'Mot de passe trop court (min 6)' });
+      return false;
+    }
+    if (formData.password !== formData.password_confirmation) {
+      Toast.show({ type: 'error', text1: 'Mots de passe différents' });
       return false;
     }
     return true;
   };
 
   const handleRegister = async () => {
-    if (
-      formData.session_id === 0 ||
-      formData.centre_examen_id === 0 ||
-      formData.lieux_pratique.length === 0 ||
-      formData.vague === ''
-    ) {
-      Toast.show({ type: 'error', text1: 'Veuillez remplir tous les champs obligatoires' });
-      return;
-    }
+    if (!validateForm()) return;
 
+    Keyboard.dismiss();
     setLoading(true);
-    const success = await register({
-      ...formData,
-      vague: formData.vague as Vague,
-    });
-    setLoading(false);
-    if (success) {
-      navigation.navigate('Login');
+
+    try {
+      const success = await register({
+        ...formData,
+        vague: formData.vague as Vague,
+      });
+
+      if (success) {
+        setLoading(false);
+        Toast.show({
+          type: 'success',
+          text1: 'Inscription réussie',
+        });
+        navigation.goBack();
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Échec de l\'inscription',
+        });
+      }
+    } catch (error: any) {
+      Toast.show({
+        type: 'error',
+        text1: 'Erreur',
+        text2: error?.message || 'Une erreur est survenue',
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
-  const renderStep1 = () => (
-    <>
-      <Input label="Nom" placeholder="Votre nom" value={formData.nom} onChangeText={(v) => updateField('nom', v)} leftIcon="person-outline" />
-      <Input label="Prénom" placeholder="Votre prénom" value={formData.prenom} onChangeText={(v) => updateField('prenom', v)} leftIcon="person-outline" />
-      <Input label="Téléphone" placeholder="6XXXXXXXX" value={formData.telephone} onChangeText={(v) => updateField('telephone', v)} keyboardType="phone-pad" leftIcon="call-outline" />
-      
-      <Text style={styles.label}>Date de naissance (facultatif)</Text>
-      <TouchableOpacity 
-        style={styles.datePickerButton} 
-        onPress={() => setShowDatePicker(true)}
-      >
-        <Text style={[styles.datePickerText, !formData.date_naissance && styles.placeholderText]}>
-          {formData.date_naissance ? formatDateDisplay(formData.date_naissance) : 'Sélectionner une date'}
-        </Text>
-        <Text style={styles.calendarIcon}>📅</Text>
-      </TouchableOpacity>
-      
-      <Input label="Quartier (facultatif)" placeholder="Votre quartier" value={formData.quartier} onChangeText={(v) => updateField('quartier', v)} leftIcon="location-outline" />
-    </>
-  );
-
-  const renderStep2 = () => (
-    <>
-      <Text style={styles.label}>Catégorie de permis</Text>
-      <View style={styles.pickerContainer}>
-        <Picker selectedValue={formData.type_permis} onValueChange={(v) => updateField('type_permis', v)}>
-          <Picker.Item label="A" value="permis_a" />
-          <Picker.Item label="B" value="permis_b" />
-          <Picker.Item label="BE (Non disponible)" value="permis_be" enabled={false} color="#999" />
-          <Picker.Item label="C (Non disponible)" value="permis_c" enabled={false} color="#999" />
-          <Picker.Item label="D (Non disponible)" value="permis_d" enabled={false} color="#999" />
-          <Picker.Item label="DE (Non disponible)" value="permis_de" enabled={false} color="#999" />
-          <Picker.Item label="FA1 (Non disponible)" value="permis_fa1" enabled={false} color="#999"/>
-          <Picker.Item label="FA (Non disponible)" value="permis_fa" enabled={false} color="#999"/>
-          <Picker.Item label="FB (Non disponible)" value="permis_fb" enabled={false} color="#999"/>
-          <Picker.Item label="G (Non disponible)" value="permis_g" enabled={false} color="#999"/>
-        </Picker>
-      </View>
-
-      <Text style={styles.label}>Type de cours</Text>
-      <View style={styles.pickerContainer}>
-        <Picker selectedValue={formData.type_cours} onValueChange={(v) => updateField('type_cours', v)}>
-          <Picker.Item label="En ligne" value="en_ligne" />
-          <Picker.Item label="En présentiel (Samedi)" value="presentiel" />
-          <Picker.Item label="Les deux" value="les_deux" />
-        </Picker>
-      </View>
-
-      <Text style={styles.label}>Session *</Text>
-      <View style={styles.pickerContainer}>
-        <Picker selectedValue={formData.session_id} onValueChange={(v) => updateField('session_id', Number(v))}>
-          <Picker.Item label="Choisir une session" value={0} />
-          {sessions?.filter((s) => s.active).map((session) => (
-            <Picker.Item key={session.id} label={session.nom} value={session.id} />
-          ))}
-        </Picker>
-      </View>
-
-      {formData.session_id > 0 && availableVagues.length > 0 && (
-        <>
-          <Text style={styles.label}>Vague disponible *</Text>
-          <View style={styles.pickerContainer}>
-            <Picker selectedValue={formData.vague} onValueChange={(v) => updateField('vague', v as Vague)}>
-              <Picker.Item label="Choisir une vague" value="" />
-              {availableVagues.includes('1') && <Picker.Item label="Vague 1" value="1" />}
-              {availableVagues.includes('2') && <Picker.Item label="Vague 2" value="2" />}
-            </Picker>
-          </View>
-        </>
-      )}
-
-      {formData.session_id > 0 && availableVagues.length === 0 && (
-        <Text style={styles.errorText}>Aucune vague d'enregistrement ouverte pour cette session.</Text>
-      )}
-    </>
-  );
-
-  const renderStep3 = () => (
-    <>
-      <Text style={styles.label}>Centre d'examen *</Text>
-      <View style={styles.pickerContainer}>
-        <Picker selectedValue={formData.centre_examen_id} onValueChange={(v) => updateField('centre_examen_id', Number(v))}>
-          <Picker.Item label="Choisir un centre" value={0} />
-          {centresExamen?.filter((c) => c.active).map((centre) => (
-            <Picker.Item
-              key={centre.id}
-              label={`${centre.nom} ${centre.ville ? `(${centre.ville})` : ''}`}
-              value={centre.id}
-            />
-          ))}
-        </Picker>
-      </View>
-    </>
-  );
-
-  const renderStep4 = () => (
-    <>
-      <Text style={styles.label}>Lieux de pratique (au moins un) *</Text>
-      <View style={styles.checkboxContainer}>
-        {lieuxPratique?.filter((l) => l.active).map((lieu) => (
-          <TouchableOpacity key={lieu.id} style={styles.checkboxItem} onPress={() => toggleLieuPratique(lieu.id)}>
-            <View
-              style={[
-                styles.checkbox,
-                formData.lieux_pratique.includes(lieu.id) && styles.checkboxChecked,
-              ]}
-            >
-              {formData.lieux_pratique.includes(lieu.id) && <Text style={styles.checkmark}>✓</Text>}
-            </View>
-            <Text style={styles.checkboxLabel}>
-              {lieu.nom} {lieu.ville ? `(${lieu.ville})` : ''}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <Input
-        label="Code de parrainage (facultatif)"
-        placeholder="Code de votre parrain"
-        value={formData.code_parrainage}
-        onChangeText={(v) => updateField('code_parrainage', v)}
-        leftIcon="gift-outline"
-      />
-      <TouchableOpacity onPress={handleNoCode} style={styles.noCodeBtn}>
-        <Text style={styles.noCodeText}>Je n'ai pas de code</Text>
-      </TouchableOpacity>
-
-      <Input
-        label="Mot de passe"
-        placeholder="Min. 6 caractères"
-        value={formData.password}
-        onChangeText={(v) => updateField('password', v)}
-        isPassword
-        leftIcon="lock-closed-outline"
-      />
-      <Input
-        label="Confirmer le mot de passe"
-        placeholder="Confirmez"
-        value={formData.password_confirmation}
-        onChangeText={(v) => updateField('password_confirmation', v)}
-        isPassword
-        leftIcon="lock-closed-outline"
-      />
-    </>
-  );
+  if (!sessions || !centresExamen || !lieuxPratique) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <Text style={styles.loadingText}>Chargement...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={styles.content}>
-          <TouchableOpacity
-            onPress={() => (step > 1 ? setStep(step - 1) : navigation.goBack())}
-            style={styles.backButton}
-          >
-            <Text style={styles.backText}>← {step > 1 ? 'Étape précédente' : 'Retour'}</Text>
-          </TouchableOpacity>
-
-          <Text style={styles.title}>Inscription</Text>
-          <Text style={styles.stepIndicator}>Étape {step}/4</Text>
-
-          <View style={styles.form}>
-            {step === 1 && renderStep1()}
-            {step === 2 && renderStep2()}
-            {step === 3 && renderStep3()}
-            {step === 4 && renderStep4()}
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.flex}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Header */}
+          <View style={styles.header}>
+            <TouchableOpacity
+              onPress={() => navigation.goBack()}
+              disabled={loading}
+              style={styles.backButton}
+            >
+              <Text style={styles.backText}>← Retour</Text>
+            </TouchableOpacity>
+            <Text style={styles.title}>Inscription</Text>
           </View>
 
-          {step < 4 ? (
-            <Button
-              title="Continuer"
-              onPress={() => {
-                if (validateAndNext()) {
-                  setStep(step + 1);
-                }
-              }}
-              fullWidth
-              size="large"
+          {/* Informations personnelles */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Informations personnelles</Text>
+            
+            <Input
+              label="Nom *"
+              placeholder="Votre nom"
+              value={formData.nom}
+              onChangeText={v => updateField('nom', v)}
+              leftIcon="person-outline"
+              editable={!loading}
+              autoCapitalize="words"
             />
-          ) : (
-            <Button title="S'inscrire" onPress={handleRegister} loading={loading} fullWidth size="large" />
-          )}
-        </ScrollView>
-      </KeyboardAvoidingView>
 
-      {/* Modal du calendrier */}
-      <Modal
-        visible={showDatePicker}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowDatePicker(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.calendarModal}>
-            <View style={styles.calendarHeader}>
-              <TouchableOpacity onPress={previousMonth} style={styles.navButton}>
-                <Text style={styles.navButtonText}>◀</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => setShowYearPicker(true)} style={styles.titleButton}>
-                <Text style={styles.calendarTitle}>
-                  {monthNames[currentMonth]} {currentYear}
-                </Text>
-                <Text style={styles.dropdownIcon}>▼</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                onPress={nextMonth} 
-                style={styles.navButton}
-                disabled={currentYear === new Date().getFullYear() && currentMonth === new Date().getMonth()}
-              >
-                <Text style={[
-                  styles.navButtonText,
-                  currentYear === new Date().getFullYear() && currentMonth === new Date().getMonth() && styles.navButtonDisabled
-                ]}>▶</Text>
-              </TouchableOpacity>
-            </View>
+            <Input
+              label="Prénom *"
+              placeholder="Votre prénom"
+              value={formData.prenom}
+              onChangeText={v => updateField('prenom', v)}
+              leftIcon="person-outline"
+              editable={!loading}
+              autoCapitalize="words"
+            />
 
-            <View style={styles.weekDays}>
-              {daysOfWeek.map((day) => (
-                <Text key={day} style={styles.weekDayText}>{day}</Text>
-              ))}
-            </View>
+            <Input
+              label="Téléphone *"
+              placeholder="6XXXXXXXX"
+              value={formData.telephone}
+              onChangeText={v => updateField('telephone', v)}
+              keyboardType="phone-pad"
+              leftIcon="call-outline"
+              editable={!loading}
+              maxLength={9}
+            />
 
-            <View style={styles.calendarGrid}>
-              {generateCalendarDays().map((day, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={[
-                    styles.dayCell,
-                    day === null && styles.emptyDay,
-                    day && isSelected(day) && styles.selectedDay,
-                    day && isToday(day) && !isSelected(day) && styles.todayDay,
-                  ]}
-                  onPress={() => day && handleDateSelect(day)}
-                  disabled={day === null}
-                >
-                  {day && (
-                    <Text style={[
-                      styles.dayText,
-                      isSelected(day) && styles.selectedDayText,
-                      isToday(day) && !isSelected(day) && styles.todayDayText,
-                    ]}>
-                      {day}
-                    </Text>
-                  )}
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <View style={styles.calendarFooter}>
-              <TouchableOpacity 
-                style={[styles.calendarButton, styles.cancelButton]} 
-                onPress={() => setShowDatePicker(false)}
-              >
-                <Text style={styles.cancelButtonText}>Annuler</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.calendarButton, styles.confirmButton]} 
-                onPress={handleDateConfirm}
-              >
-                <Text style={styles.confirmButtonText}>Confirmer</Text>
-              </TouchableOpacity>
-            </View>
+            <Input
+              label="Quartier (facultatif)"
+              placeholder="Votre quartier"
+              value={formData.quartier}
+              onChangeText={v => updateField('quartier', v)}
+              leftIcon="location-outline"
+              editable={!loading}
+            />
           </View>
-        </View>
-      </Modal>
 
-      {/* Modal sélection d'année */}
-      <Modal
-        visible={showYearPicker}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowYearPicker(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.yearPickerModal}>
-            <Text style={styles.yearPickerTitle}>Sélectionner l'année</Text>
-            <ScrollView style={styles.yearList} showsVerticalScrollIndicator={true}>
-              {years.map((year) => (
+          {/* Configuration du permis */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Configuration</Text>
+
+            <CustomSelect
+              label="Catégorie de permis"
+              value={formData.type_permis}
+              placeholder="Choisir un type"
+              options={permisOptions}
+              onSelect={v => updateField('type_permis', v)}
+              disabled={loading}
+            />
+
+            <CustomSelect
+              label="Type de cours"
+              value={formData.type_cours}
+              placeholder="Choisir un type"
+              options={coursOptions}
+              onSelect={v => updateField('type_cours', v)}
+              disabled={loading}
+            />
+
+            <CustomSelect
+              label="Session *"
+              value={String(formData.session_id)}
+              placeholder="Choisir une session"
+              options={sessionOptions}
+              onSelect={v => updateField('session_id', Number(v))}
+              disabled={loading}
+            />
+
+            {availableVagues.length > 0 && (
+              <CustomSelect
+                label="Vague *"
+                value={formData.vague}
+                placeholder="Choisir une vague"
+                options={vagueOptions}
+                onSelect={v => updateField('vague', v as Vague)}
+                disabled={loading}
+              />
+            )}
+
+            <CustomSelect
+              label="Centre d'examen *"
+              value={String(formData.centre_examen_id)}
+              placeholder="Choisir un centre"
+              options={centreOptions}
+              onSelect={v => updateField('centre_examen_id', Number(v))}
+              disabled={loading}
+            />
+          </View>
+
+          {/* Lieux de pratique */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Lieux de pratique *</Text>
+            <View style={styles.checkboxContainer}>
+              {activeLieux.map(lieu => (
                 <TouchableOpacity
-                  key={year}
-                  style={[
-                    styles.yearItem,
-                    year === currentYear && styles.selectedYearItem
-                  ]}
-                  onPress={() => handleYearSelect(year)}
+                  key={lieu.id}
+                  style={styles.checkboxItem}
+                  onPress={() => toggleLieuPratique(lieu.id)}
+                  disabled={loading}
+                  activeOpacity={0.7}
                 >
-                  <Text style={[
-                    styles.yearText,
-                    year === currentYear && styles.selectedYearText
-                  ]}>
-                    {year}
+                  <View
+                    style={[
+                      styles.checkbox,
+                      formData.lieux_pratique.includes(lieu.id) && styles.checkboxChecked,
+                    ]}
+                  >
+                    {formData.lieux_pratique.includes(lieu.id) && (
+                      <Text style={styles.checkmark}>✓</Text>
+                    )}
+                  </View>
+                  <Text style={styles.checkboxLabel}>
+                    {lieu.nom} {lieu.ville ? `(${lieu.ville})` : ''}
                   </Text>
                 </TouchableOpacity>
               ))}
-            </ScrollView>
-            <TouchableOpacity 
-              style={styles.yearPickerCloseButton} 
-              onPress={() => setShowYearPicker(false)}
-            >
-              <Text style={styles.yearPickerCloseText}>Fermer</Text>
-            </TouchableOpacity>
+            </View>
           </View>
-        </View>
-      </Modal>
+
+          {/* Sécurité */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Sécurité</Text>
+
+            <Input
+              label="Code parrainage (facultatif)"
+              placeholder="Code de votre parrain"
+              value={formData.code_parrainage}
+              onChangeText={v => updateField('code_parrainage', v)}
+              leftIcon="gift-outline"
+              editable={!loading}
+              autoCapitalize="characters"
+            />
+
+            <TouchableOpacity
+              onPress={handleNoCode}
+              style={styles.noCodeBtn}
+              disabled={loading}
+            >
+              <Text style={styles.noCodeText}>Je n'ai pas de code</Text>
+            </TouchableOpacity>
+
+            <Input
+              label="Mot de passe *"
+              placeholder="Min. 6 caractères"
+              value={formData.password}
+              onChangeText={v => updateField('password', v)}
+              isPassword
+              leftIcon="lock-closed-outline"
+              editable={!loading}
+            />
+
+            <Input
+              label="Confirmer le mot de passe *"
+              placeholder="Confirmez votre mot de passe"
+              value={formData.password_confirmation}
+              onChangeText={v => updateField('password_confirmation', v)}
+              isPassword
+              leftIcon="lock-closed-outline"
+              editable={!loading}
+            />
+          </View>
+
+          {/* Bouton d'inscription */}
+          <Button
+            title={loading ? 'Inscription...' : 'S\'inscrire'}
+            onPress={handleRegister}
+            loading={loading}
+            disabled={loading}
+            fullWidth
+            size="large"
+          />
+
+          <View style={styles.footer} />
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.colors.background },
-  content: { flexGrow: 1, padding: theme.spacing.lg },
-  backButton: { marginBottom: theme.spacing.md },
-  backText: { ...theme.typography.body, color: theme.colors.primary },
-  title: { ...theme.typography.h1, color: theme.colors.textPrimary },
-  stepIndicator: {
-    ...theme.typography.bodySmall,
-    color: theme.colors.textSecondary,
-    marginTop: theme.spacing.xs,
-    marginBottom: theme.spacing.lg,
+  container: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
   },
-  form: { marginBottom: theme.spacing.lg },
+  flex: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    padding: theme.spacing.lg,
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    ...theme.typography.body,
+    color: theme.colors.textSecondary,
+    marginTop: theme.spacing.md,
+  },
+  header: {
+    marginBottom: theme.spacing.xl,
+  },
+  backButton: {
+    marginBottom: theme.spacing.sm,
+  },
+  backText: {
+    ...theme.typography.body,
+    color: theme.colors.primary,
+  },
+  title: {
+    ...theme.typography.h1,
+    color: theme.colors.textPrimary,
+  },
+  section: {
+    marginBottom: theme.spacing.xl,
+  },
+  sectionTitle: {
+    ...theme.typography.h3,
+    color: theme.colors.textPrimary,
+    marginBottom: theme.spacing.md,
+  },
   label: {
     ...theme.typography.bodySmall,
     fontWeight: '500',
@@ -573,14 +598,11 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.xs,
     marginTop: theme.spacing.sm,
   },
-  pickerContainer: {
-    backgroundColor: theme.colors.surface,
-    borderWidth: 1.5,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.lg,
+  // Custom Select Styles
+  selectWrapper: {
     marginBottom: theme.spacing.md,
   },
-  datePickerButton: {
+  selectButton: {
     backgroundColor: theme.colors.surface,
     borderWidth: 1.5,
     borderColor: theme.colors.border,
@@ -589,26 +611,94 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: theme.spacing.md,
+    minHeight: 52,
   },
-  datePickerText: {
+  selectButtonDisabled: {
+    opacity: 0.5,
+  },
+  selectButtonText: {
     ...theme.typography.body,
     color: theme.colors.textPrimary,
+    flex: 1,
   },
-  placeholderText: {
+  selectPlaceholder: {
     color: theme.colors.textSecondary,
   },
-  calendarIcon: {
+  selectArrow: {
+    color: theme.colors.textSecondary,
+    fontSize: 12,
+    marginLeft: theme.spacing.sm,
+  },
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: theme.colors.background,
+    borderTopLeftRadius: theme.borderRadius.xl,
+    borderTopRightRadius: theme.borderRadius.xl,
+    maxHeight: '70%',
+    paddingBottom: theme.spacing.xl,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: theme.spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
+  modalTitle: {
+    ...theme.typography.h3,
+    color: theme.colors.textPrimary,
+  },
+  modalCloseBtn: {
+    padding: theme.spacing.xs,
+  },
+  modalCloseText: {
+    ...theme.typography.h2,
+    color: theme.colors.textSecondary,
+  },
+  modalScroll: {
+    maxHeight: '100%',
+  },
+  modalOption: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: theme.spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
+  modalOptionSelected: {
+    backgroundColor: theme.colors.primaryLight || `${theme.colors.primary}15`,
+  },
+  modalOptionText: {
+    ...theme.typography.body,
+    color: theme.colors.textPrimary,
+    flex: 1,
+  },
+  modalOptionTextSelected: {
+    color: theme.colors.primary,
+    fontWeight: '600',
+  },
+  modalCheckmark: {
+    color: theme.colors.primary,
     fontSize: 20,
+    fontWeight: 'bold',
+    marginLeft: theme.spacing.sm,
   },
-  errorText: {
-    ...theme.typography.bodySmall,
-    color: '#FF3B30',
-    textAlign: 'center',
-    marginTop: theme.spacing.sm,
+  // Checkbox Styles
+  checkboxContainer: {
+    gap: theme.spacing.sm,
   },
-  checkboxContainer: { marginBottom: theme.spacing.md },
-  checkboxItem: { flexDirection: 'row', alignItems: 'center', marginVertical: theme.spacing.xs },
+  checkboxItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: theme.spacing.xs,
+  },
   checkbox: {
     width: 24,
     height: 24,
@@ -619,180 +709,30 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  checkboxChecked: { backgroundColor: theme.colors.primary },
-  checkmark: { color: 'white', fontWeight: 'bold', fontSize: 16 },
-  checkboxLabel: { ...theme.typography.body, color: theme.colors.textPrimary, flex: 1 },
-  noCodeBtn: { alignSelf: 'flex-end', marginBottom: theme.spacing.md },
-  noCodeText: { ...theme.typography.bodySmall, color: theme.colors.secondary },
-  
-  // Styles du modal calendrier
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  calendarModal: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 20,
-    width: '90%',
-    maxWidth: 380,
-  },
-  calendarHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  calendarTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: theme.colors.textPrimary,
-  },
-  titleButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  dropdownIcon: {
-    fontSize: 12,
-    color: theme.colors.primary,
-  },
-  navButton: {
-    padding: 8,
-  },
-  navButtonText: {
-    fontSize: 20,
-    color: theme.colors.primary,
-    fontWeight: 'bold',
-  },
-  navButtonDisabled: {
-    color: '#ccc',
-  },
-  weekDays: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 10,
-  },
-  weekDayText: {
-    width: 40,
-    textAlign: 'center',
-    fontSize: 12,
-    fontWeight: '600',
-    color: theme.colors.textSecondary,
-  },
-  calendarGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 20,
-  },
-  dayCell: {
-    width: '14.28%',
-    aspectRatio: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 4,
-  },
-  emptyDay: {
-    backgroundColor: 'transparent',
-  },
-  dayText: {
-    fontSize: 16,
-    color: theme.colors.textPrimary,
-  },
-  selectedDay: {
-    backgroundColor: theme.colors.primary,
-    borderRadius: 20,
-  },
-  selectedDayText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
-  todayDay: {
-    borderWidth: 2,
-    borderColor: theme.colors.primary,
-    borderRadius: 20,
-  },
-  todayDayText: {
-    color: theme.colors.primary,
-    fontWeight: '600',
-  },
-  calendarFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  calendarButton: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  cancelButton: {
-    backgroundColor: '#F5F5F5',
-  },
-  confirmButton: {
+  checkboxChecked: {
     backgroundColor: theme.colors.primary,
   },
-  cancelButtonText: {
-    fontSize: 16,
-    color: theme.colors.textPrimary,
-    fontWeight: '600',
-  },
-  confirmButtonText: {
-    fontSize: 16,
+  checkmark: {
     color: 'white',
-    fontWeight: '600',
-  },
-  
-  // Styles du sélecteur d'année
-  yearPickerModal: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 20,
-    width: '80%',
-    maxWidth: 300,
-    maxHeight: '70%',
-  },
-  yearPickerTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: theme.colors.textPrimary,
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  yearList: {
-    maxHeight: 400,
-  },
-  yearItem: {
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-    alignItems: 'center',
-  },
-  selectedYearItem: {
-    backgroundColor: theme.colors.primary + '15',
-  },
-  yearText: {
-    fontSize: 18,
-    color: theme.colors.textPrimary,
-  },
-  selectedYearText: {
-    color: theme.colors.primary,
     fontWeight: 'bold',
-  },
-  yearPickerCloseButton: {
-    marginTop: 16,
-    padding: 14,
-    backgroundColor: '#F5F5F5',
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  yearPickerCloseText: {
     fontSize: 16,
+  },
+  checkboxLabel: {
+    ...theme.typography.body,
     color: theme.colors.textPrimary,
-    fontWeight: '600',
+    flex: 1,
+  },
+  noCodeBtn: {
+    alignSelf: 'flex-end',
+    marginBottom: theme.spacing.md,
+    padding: theme.spacing.xs,
+  },
+  noCodeText: {
+    ...theme.typography.bodySmall,
+    color: theme.colors.secondary,
+  },
+  footer: {
+    height: theme.spacing.xl,
   },
 });
 

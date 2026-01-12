@@ -14,6 +14,7 @@ import { apiRequest } from '../../config/api';
 import { Chapitre, Lecon } from '../../types';
 import { useAuth } from '../../context/AuthContext'; // Assurez-vous que le chemin est correct selon votre structure de projet
 import Toast from 'react-native-toast-message';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 export default function ChapitreDetailScreen({ route, navigation }: any) {
   const { chapitreId, moduleId, type } = route.params;
@@ -202,7 +203,8 @@ export default function ChapitreDetailScreen({ route, navigation }: any) {
   const progress = totalLecons > 0 ? (leconsCompletes / totalLecons) * 100 : 0;
 
   return (
-    <View style={styles.container}>
+     <SafeAreaProvider>
+        <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         {chapitre.description && (
           <Text style={styles.description}>{chapitre.description}</Text>
@@ -296,7 +298,8 @@ export default function ChapitreDetailScreen({ route, navigation }: any) {
           </View>
         }
       />
-    </View>
+    </SafeAreaView>
+    </SafeAreaProvider>
   );
 }
 

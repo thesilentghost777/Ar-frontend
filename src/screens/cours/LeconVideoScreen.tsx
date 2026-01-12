@@ -16,6 +16,7 @@ import { theme } from '../../config/theme';
 import { apiRequest } from '../../config/api';
 import { useAuth } from '../../context/AuthContext';
 import Toast from 'react-native-toast-message';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
 
@@ -177,7 +178,8 @@ export default function LeconVideoScreen({ route, navigation }: any) {
   const progressPercentage = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   return (
-    <View style={styles.container}>
+     <SafeAreaProvider>
+        <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Lecteur vidéo */}
         <View style={styles.videoWrapper}>
@@ -269,7 +271,8 @@ export default function LeconVideoScreen({ route, navigation }: any) {
           )}
         </TouchableOpacity>
       </View>
-    </View>
+    </SafeAreaView>
+    </SafeAreaProvider>
   );
 }
 
